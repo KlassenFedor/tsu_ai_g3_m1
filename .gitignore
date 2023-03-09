@@ -128,5 +128,4 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-./idea
-./tsu_ai_m1/.idea
+.idea/
