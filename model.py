@@ -20,7 +20,7 @@ class My_Rec_Model:
         self.movies_dict = dict(zip(self.movies_dict['MovieID'], self.movies_dict['Title']))
 
     def warmup(self):
-        self.model = pd.read_csv('./model/model.csv')
+        self.model = pd.read_csv('./model/model.csv', index_col='UserID')
 
     def __get_movie_name_by_id(self, movie_id):
         return self.movies_dict[movie_id]
@@ -80,31 +80,52 @@ class My_Rec_Model:
         return rmse
 
     def predict(self, movies_ratings, count=5):
-        ids = movies_ratings[0]
+        movies_ids = [str(item) for item in movies_ratings[0]]
         ratings = movies_ratings[1]
-        vector = dict()
-        for i in range(len(ids)):
-            vector[ids[i]] = ratings[i]
-
-        similarity = dict()
-        predict = pd.read_csv('./model/model.csv') if self.model is None else self.model
-        pred = predict[ids]
-        for index in predict.index:
-            similarity[index] = self.__find_vectors_similarity(pred.iloc[index - 1, :], [v for k, v in vector.items()])
-
-        n_users = 5
-        r = list({k: v for k, v in sorted(similarity.items(), key=lambda x: x[1], reverse=True)})[:n_users]
-        movies_ratings = dict()
-        for movie in self.model.columns[1:]:
-            movies_ratings[movie] = self.__get_mean_rating_for_users([item[0] for item in r], movie)
-
-        movies_ratings = list(
+        self.warmup()
+        predicted_ratings = self.model
+        predicted_ratings['similarity'] = [
+            self.__find_vectors_similarity(
+                predicted_ratings.loc[i][movies_ids],
+                ratings
+            ) for i in predicted_ratings.index
+        ]
+        predicted_ratings = predicted_ratings.sort_values(by='similarity').iloc[:5]
+        predicted_ratings = predicted_ratings.drop(columns=movies_ids)
+        mean_ratings = predicted_ratings.mean(axis=0).to_dict()
+        best_movies = list(
             {
-                k: v for k, v in sorted(movies_ratings.items(), key=lambda x: x[1], reverse=True)
-            }
+                k: v for k, v in sorted(mean_ratings.items(), key=lambda x: x[1], reverse=True)
+            }.items()
         )[:count]
 
-        return [[item[0] for item in movies_ratings], [item[1] for item in movies_ratings]]
+        return [[item[0] for item in best_movies], [item[1] for item in best_movies]]
+
+
+        # vector = dict()
+        # for i in range(len(movies_ids)):
+        #     vector[movies_ids[i]] = ratings[i]
+        #
+        # similarity = dict()
+        # predict = pd.read_csv('./model/model.csv') if self.model is None else self.model
+        # self.model = pd.read_csv('./model/model.csv')
+        # pred = predict[movies_ids]
+        # for index in predict.index:
+        #     similarity[index] = self.__find_vectors_similarity(pred.iloc[index - 1, :], [v for k, v in vector.items()])
+        #
+        # n_users = 5
+        # r = list({k: v for k, v in sorted(similarity.items(), key=lambda x: x[1], reverse=True)})[:n_users]
+        # movies_ratings = dict()
+        # for movie in self.model.columns[1:]:
+        #     movies_ratings[movie] = self.__get_mean_rating_for_users([item[0] for item in r], movie)
+        #
+        # movies_ratings = list(
+        #     {
+        #         k: v for k, v in sorted(movies_ratings.items(), key=lambda x: x[1], reverse=True)
+        #     }
+        # )[:count]
+        #
+        # return [[item[0] for item in movies_ratings], [item[1] for item in movies_ratings]]
 
     def find_similar(self, movie_id, count=5):
         movie_id = str(movie_id)
@@ -130,6 +151,9 @@ class My_Rec_Model:
     def __get_mean_rating_for_users(self, user_ids, movie_id):
         ratings = self.model.iloc[user_ids][str(movie_id)]
         return np.mean(ratings)
+
+    def test(self, arr):
+        return arr[0]
 
 
 if __name__ == '__main__':
