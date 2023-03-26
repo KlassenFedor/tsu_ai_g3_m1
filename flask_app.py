@@ -10,10 +10,17 @@ model = My_Rec_Model()
 @app.route('/api/predict')
 def predict():
     request_data = request.get_json()
+    print(request_data)
     movies = list(request_data[0])
     ratings = list(request_data[1])
-    result = model.predict([movies, ratings], 20)
-    return [[model.movies_dict[movie] for movie in result[0]], result[1]]
+    result = model.predict(
+        [
+            [find_movie_id(movie, model.movies_dict) for movie in movies],
+            ratings
+        ],
+        5
+    )
+    return [[model.movies_dict[int(movie)] for movie in result[0]], result[1]]
 
 
 @app.route('/api/log')
@@ -50,9 +57,11 @@ def reload():
 def similar():
     request_data = request.get_json()
     global model
+    print(request_data)
     movie_id = find_movie_id(request_data['movie_name'], model.movies_dict)
     similar_movies = model.find_similar(movie_id)
-    return [model.movies_dict[movie] for movie in similar_movies]
+    print(similar_movies)
+    return [model.movies_dict[int(movie)] for movie in similar_movies[0]]
 
 
 def find_movie_id(name, movies_dict):

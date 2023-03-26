@@ -18,6 +18,7 @@ class My_Rec_Model:
             names=['MovieID', 'Title', 'Genres']
         )
         self.movies_dict = dict(zip(self.movies_dict['MovieID'], self.movies_dict['Title']))
+        self.warmup()
 
     def warmup(self):
         self.model = pd.read_csv('./model/model.csv', index_col='UserID')
@@ -90,7 +91,7 @@ class My_Rec_Model:
                 ratings
             ) for i in predicted_ratings.index
         ]
-        predicted_ratings = predicted_ratings.sort_values(by='similarity').iloc[:5]
+        predicted_ratings = predicted_ratings.sort_values(by='similarity').iloc[:3]
         predicted_ratings = predicted_ratings.drop(columns=movies_ids)
         mean_ratings = predicted_ratings.mean(axis=0).to_dict()
         best_movies = list(
