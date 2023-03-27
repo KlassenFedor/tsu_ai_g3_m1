@@ -86,7 +86,7 @@ class My_Rec_Model:
         # receiving predicts for data in test set
         predicts = []
         for i in range(ratings.shape[0]):
-            predicts.append(model[model['UserID'] == ratings.iloc[i]['UserID']][str(ratings.iloc[i]['MovieID'])])
+            predicts.append(model.loc[ratings.iloc[i]['UserID']][str(ratings.iloc[i]['MovieID'])])
         ratings['predict'] = predicts
 
         # rmse calculation
@@ -149,7 +149,7 @@ class My_Rec_Model:
         return [movies_ids, movies_names]
 
     def __calculate_rmse(self, data):
-        data['difference'] = data['predict'] - data['Rating']
+        data['difference'] = (np.array(data['predict']) - np.array(data['Rating'])) ** 2
         rmse = (sum(data['difference']) / data.shape[0]) ** 0.5
 
         return rmse
