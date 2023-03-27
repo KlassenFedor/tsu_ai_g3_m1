@@ -1,7 +1,6 @@
 import fire
 import pandas as pd
 import numpy as np
-import scipy.spatial.distance as ds
 
 
 class My_Rec_Model:
