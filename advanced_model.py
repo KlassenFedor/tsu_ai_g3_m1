@@ -1,13 +1,18 @@
-import fire
 import pandas as pd
 import numpy as np
+from surprise.prediction_algorithms import KNNBaseline
+from surprise.model_selection import cross_validate, train_test_split, GridSearchCV
+from surprise import Dataset, Reader, dataset
+from surprise import trainset
+from surprise import accuracy
 import logging
 import datetime
+
 logging.basicConfig(level=logging.INFO, filename="./data/logs.log", filemode="w")
 logger = logging.getLogger('model')
 
 
-class My_Rec_Model:
+class AdvancedModel:
     def __init__(self):
         self.model = None
         self.ratings = None
@@ -105,32 +110,6 @@ class My_Rec_Model:
         )[:count]
 
         return [[item[0] for item in best_movies], [item[1] for item in best_movies]]
-
-
-        # vector = dict()
-        # for i in range(len(movies_ids)):
-        #     vector[movies_ids[i]] = ratings[i]
-        #
-        # similarity = dict()
-        # predict = pd.read_csv('./model/model.csv') if self.model is None else self.model
-        # self.model = pd.read_csv('./model/model.csv')
-        # pred = predict[movies_ids]
-        # for index in predict.index:
-        #     similarity[index] = self.__find_vectors_similarity(pred.iloc[index - 1, :], [v for k, v in vector.items()])
-        #
-        # n_users = 5
-        # r = list({k: v for k, v in sorted(similarity.items(), key=lambda x: x[1], reverse=True)})[:n_users]
-        # movies_ratings = dict()
-        # for movie in self.model.columns[1:]:
-        #     movies_ratings[movie] = self.__get_mean_rating_for_users([item[0] for item in r], movie)
-        #
-        # movies_ratings = list(
-        #     {
-        #         k: v for k, v in sorted(movies_ratings.items(), key=lambda x: x[1], reverse=True)
-        #     }
-        # )[:count]
-        #
-        # return [[item[0] for item in movies_ratings], [item[1] for item in movies_ratings]]
 
     def find_similar(self, movie_id, count=5):
         movie_id = str(movie_id)

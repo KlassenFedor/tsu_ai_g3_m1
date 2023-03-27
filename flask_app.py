@@ -2,12 +2,17 @@ from flask import Flask, request
 from fuzzywuzzy import fuzz
 from model import My_Rec_Model
 import json
+import logging
+import datetime
+
+logging.basicConfig(level=logging.INFO, filename="./data/logs.log", filemode="w")
+logger = logging.getLogger('model')
 
 app = Flask(__name__)
 model = My_Rec_Model()
 
 
-@app.route('/api/predict')
+@app.route('/api/predict', methods=['POST'])
 def predict():
     request_data = request.get_json()
     print(request_data)
@@ -23,37 +28,41 @@ def predict():
     return [[model.movies_dict[int(movie)] for movie in result[0]], result[1]]
 
 
-@app.route('/api/log')
+@app.route('/api/log', methods=['GET'])
 def log():
     logs = []
-    with open('./logging/logs.log') as file:
+    with open('./data/logs.log') as file:
         for line in (file.readlines()[-20:]):
             logs.append(line)
     return logs
 
 
-@app.route('/api/info')
+@app.route('/api/info', methods=['GET'])
 def info():
-    credentials = 'Klassen Fedor, 3rd grade'
-    logs = ''
-    with open('./logging/logs.log') as file:
-        for line in (file.readlines()[-20:]):
-            logs += line
+    data = []
+    with open('./info.txt') as file:
+        for line in (file.readlines()):
+            data.append(line)
     result = json.dumps(
         {
-            'credentials': credentials
+            'docker-build-time': data[0],
+            'credentials': data[1]
         }
     )
+    logger.info(f'time: {datetime.datetime.now()}, info')
+
     return result
 
 
-@app.route('/api/reload')
+@app.route('/api/reload', methods=['GET'])
 def reload():
     global model
     model = My_Rec_Model()
+    model.warmup()
+    return 'success'
 
 
-@app.route('/api/similar')
+@app.route('/api/similar', methods=['POST'])
 def similar():
     request_data = request.get_json()
     global model
@@ -76,4 +85,5 @@ def find_movie_id(name, movies_dict):
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0')
+    from waitress import serve
+    serve(app, host="0.0.0.0", port=5000)
