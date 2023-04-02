@@ -144,7 +144,7 @@ class My_Rec_Model:
             cosine_similarity(self.movies_factors.T, self.movies_factors.T), index=self.model.columns,
             columns=self.model.columns
         )
-        best_movies = movies_similarity.sort_values(by=str(movie_id), ascending=False).iloc[1:count].index
+        best_movies = movies_similarity.sort_values(by=str(movie_id), ascending=False).iloc[1:(count + 1)].index
 
         movies_names = [self.__get_movie_name_by_id(int(movie)) for movie in best_movies]
 
