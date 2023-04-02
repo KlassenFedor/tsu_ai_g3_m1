@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import logging
 import datetime
+from sklearn.metrics.pairwise import cosine_similarity, cosine_distances, euclidean_distances
 logging.basicConfig(level=logging.INFO, filename="./data/logs.log", filemode="w")
 logger = logging.getLogger('model')
 
@@ -12,6 +13,8 @@ class My_Rec_Model:
         self.model = None
         self.ratings = None
         self.n_latent_factors = 20
+        self.users_factors = None
+        self.movies_factors = None
         self.movies_dict = pd.read_csv(
             './dataset/movies.dat',
             sep='::',
@@ -21,10 +24,11 @@ class My_Rec_Model:
             names=['MovieID', 'Title', 'Genres']
         )
         self.movies_dict = dict(zip(self.movies_dict['MovieID'], self.movies_dict['Title']))
-        self.warmup()
 
     def warmup(self):
         self.model = pd.read_csv('./model/model.csv', index_col='UserID')
+        self.users_factors = pd.read_csv('./model/users_factors.csv', index_col=0).to_numpy()
+        self.movies_factors = pd.read_csv('./model/movies_factors.csv', index_col=0).to_numpy()
         logger.info(f'time: {datetime.datetime.now()}, warmup')
 
     def __get_movie_name_by_id(self, movie_id):
@@ -56,6 +60,10 @@ class My_Rec_Model:
         e = np.diag(svd_decomposition[1][:self.n_latent_factors])
         v = svd_decomposition[2][:self.n_latent_factors, :]
 
+        #users- and movies-factors
+        self.users_factors = np.matmul(u, e)
+        self.movies_factors = v
+
         # creating predictions matrix
         ratings_predict = np.matmul(u, e)
         ratings_predict = np.matmul(ratings_predict, v)
@@ -71,6 +79,8 @@ class My_Rec_Model:
 
         # saving matrix
         ratings_predict.to_csv('./model/model.csv')
+        pd.DataFrame(self.movies_factors).to_csv('./model/movies_factors.csv')
+        pd.DataFrame(self.users_factors).to_csv('./model/users_factors.csv')
 
         logger.info(f'time: {datetime.datetime.now()}, training ended')
 
@@ -99,54 +109,50 @@ class My_Rec_Model:
     def predict(self, movies_ratings, count=5):
         logger.info(f'time: {datetime.datetime.now()}, prediction started')
 
+        self.warmup()
+
+        start = datetime.datetime.now()
+
         # data preparation
         movies_ids = [str(item) for item in movies_ratings[0]]
         ratings = movies_ratings[1]
-        self.warmup()
-        predicted_ratings = self.model
 
-        # search most similar users
-        predicted_ratings['similarity'] = [
-            self.__find_vectors_similarity(
-                predicted_ratings.loc[i][movies_ids],
-                ratings
-            ) for i in predicted_ratings.index
-        ]
-        predicted_ratings = predicted_ratings.sort_values(by='similarity').iloc[:3]
-        predicted_ratings = predicted_ratings.drop(columns=movies_ids)
+        users_movies = self.model[movies_ids]
+        users_similarity = euclidean_distances(np.array(users_movies), np.array([ratings]))
+        users_similarity = pd.DataFrame(users_similarity, index=self.model.index)
+        users_movies = self.model.drop(columns=movies_ids)
+        predicted_movies = users_movies.loc[list(users_similarity.sort_values(by=0).iloc[:count].index)]
+        predicted_movies = predicted_movies.mean(axis=0).sort_values()[-(count + 1):-1]
+        predicted_movies_ids = list(predicted_movies.index)
+        predicted_movies_ratings = list(predicted_movies)
 
-        # movies ratings computations and sorting
-        mean_ratings = predicted_ratings.mean(axis=0).to_dict()
-        best_movies = list(
-            {
-                k: v for k, v in sorted(mean_ratings.items(), key=lambda x: x[1], reverse=True)
-            }.items()
-        )[:count]
+        print(datetime.datetime.now() - start)
 
         logger.info(f'time: {datetime.datetime.now()}, prediction ended')
 
-        return [[item[0] for item in best_movies], [item[1] for item in best_movies]]
+        return [predicted_movies_ids, predicted_movies_ratings]
 
     def find_similar(self, movie_id, count=5):
         logger.info(f'time: {datetime.datetime.now()}, similar searching started')
 
+        self.warmup()
+
+        start = datetime.datetime.now()
+
         # data preparation
-        movie_id = str(movie_id)
-        predict = pd.read_csv('./model/model.csv') if self.model is None else self.model
-        similarity = dict()
+        movies_similarity = pd.DataFrame(
+            cosine_similarity(self.movies_factors.T, self.movies_factors.T), index=self.model.columns,
+            columns=self.model.columns
+        )
+        best_movies = movies_similarity.sort_values(by=str(movie_id), ascending=False).iloc[1:count].index
 
-        # computations for movies similarity
-        for column in predict.columns[1:]:
-            similarity[column] = self.__find_vectors_similarity(list(predict[movie_id]), list(predict[column]))
+        movies_names = [self.__get_movie_name_by_id(int(movie)) for movie in best_movies]
 
-        # movies similarity sorting
-        rated = list({k: v for k, v in sorted(similarity.items(), key=lambda x: x[1])}.items())[:count]
-        movies_ids = [item[0] for item in rated]
-        movies_names = [self.__get_movie_name_by_id(int(movie_id)) for movie_id in movies_ids]
+        print(datetime.datetime.now() - start)
 
         logger.info(f'time: {datetime.datetime.now()}, similar searching ended')
 
-        return [movies_ids, movies_names]
+        return [best_movies, movies_names]
 
     def __calculate_rmse(self, data):
         data['difference'] = (np.array(data['predict']) - np.array(data['Rating'])) ** 2
